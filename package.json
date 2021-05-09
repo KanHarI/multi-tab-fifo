@@ -26,5 +26,8 @@
   "scripts": {
     "lint": "eslint src --ext .ts,.js --fix",
     "build": "tsc"
+  },
+  "dependencies": {
+    "get-random-values": "^1.2.2"
   }
 }
