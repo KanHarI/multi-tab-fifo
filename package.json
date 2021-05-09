@@ -1,0 +1,9 @@
+{
+  "name": "multi-tab-fifo",
+  "version": "1.0.0",
+  "description": "An implementation of fifo queue between multiple tabs",
+  "main": "index.js",
+  "repository": "https://github.com/KanHarI/multi-tab-fifo",
+  "author": "KanHarI <knaan.harpaz@gmail.com>",
+  "license": "MIT"
+}
