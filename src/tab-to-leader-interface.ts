@@ -6,12 +6,12 @@ const TICKS_TO_DELETE_DEAD_ID = 10;
 type time_ms = number;
 
 interface Message<T> {
-  message_uuid: uuid;
+  message_id: uuid;
   data: T;
 }
 
 interface QueuedMessage<T> {
-  sender_uuid: uuid;
+  worker_id: uuid;
   message: Message<T>;
 }
 
@@ -28,7 +28,7 @@ function purge_id<T>(ttli: TabToLeaderInterface<T>, id: uuid): void {
   delete ttli.heartbeat[id];
   delete ttli.incoming_messages[id];
   ttli.message_queue = ttli.message_queue.filter(
-    (message: QueuedMessage<T>) => message.sender_uuid != id
+    (message: QueuedMessage<T>) => message.worker_id != id
   );
   delete ttli.ready_messages[id];
   delete ttli.in_process_messages[id];
@@ -36,10 +36,10 @@ function purge_id<T>(ttli: TabToLeaderInterface<T>, id: uuid): void {
 
 function get_wip_message_count<T>(ttli: TabToLeaderInterface<T>): number {
   let wip_messages_counter = 0;
-  for (const id in Object.keys(ttli.ready_messages)) {
+  for (const id of Object.keys(ttli.ready_messages)) {
     wip_messages_counter += ttli.ready_messages[id].length;
   }
-  for (const id in Object.keys(ttli.in_process_messages)) {
+  for (const id of Object.keys(ttli.in_process_messages)) {
     wip_messages_counter += ttli.in_process_messages[id].length;
   }
   return wip_messages_counter;

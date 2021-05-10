@@ -1,5 +1,5 @@
-// @ts-ignore
-import getRandomValues from "get-random-values";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const getRandomValues = require("get-random-values");
 
 type uuid = string;
 
