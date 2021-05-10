@@ -1,2 +1,4 @@
-declare function uuidv4(): string;
-export { uuidv4 };
+declare type uuid = string;
+declare function generate_uuid(): uuid;
+export { generate_uuid };
+export type { uuid };
