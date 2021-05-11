@@ -145,6 +145,7 @@ class LeaderProcess<T> {
   public async stop(): Promise<void> {
     this.is_stopped = true;
     await this.thread;
+    await this.broadcast_channel.close();
   }
 }
 
