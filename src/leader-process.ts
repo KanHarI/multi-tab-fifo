@@ -114,6 +114,7 @@ class LeaderProcess<T> {
 
   private async leadership_process(): Promise<void> {
     await this.elector.awaitLeadership();
+    console.log("Initializing leader");
     const leader_store_object: TabToLeaderInterface<T> = {
       is_init: true,
       heartbeat: {},
@@ -122,9 +123,10 @@ class LeaderProcess<T> {
       ready_messages: {},
       in_process_messages: {},
     };
-    const storageObject = get_local_storage();
-    storageObject[this.channel_name] = leader_store_object;
-    console.log("Initializing leader");
+    const shared_object = get_local_storage();
+    shared_object[this.channel_name] = leader_store_object;
+    await sleep(TICK_TIME_MS * 2); // Wait for existing workers to update info
+    console.log("Leader initialized");
     while (!this.is_stopped) {
       const known_ids: Record<
         uuid,
@@ -146,6 +148,7 @@ class LeaderProcess<T> {
     this.is_stopped = true;
     await this.thread;
     await this.broadcast_channel.close();
+    console.log("Exited leader gracefully");
   }
 }
 

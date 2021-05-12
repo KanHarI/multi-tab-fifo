@@ -1,6 +1,6 @@
 import type { uuid } from "./uuid";
 
-const TICK_TIME_MS = 50;
+const TICK_TIME_MS = 10;
 const TICKS_TO_DELETE_DEAD_ID = 10;
 
 type time_ms = number;

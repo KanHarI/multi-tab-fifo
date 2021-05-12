@@ -1,5 +1,5 @@
 import type { uuid } from "./uuid";
-declare const TICK_TIME_MS = 50;
+declare const TICK_TIME_MS = 10;
 declare const TICKS_TO_DELETE_DEAD_ID = 10;
 declare type time_ms = number;
 interface Message<T> {
