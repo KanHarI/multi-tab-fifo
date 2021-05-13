@@ -22,6 +22,10 @@ class TabSharedThreadpool {
   public async stop(): Promise<void> {
     await this.fifo_worker.stop();
   }
+
+  public set_num_workers(n: number): void {
+    this.fifo_worker.set_max_concurrent_workers(n);
+  }
 }
 
 export { TabSharedThreadpool };
