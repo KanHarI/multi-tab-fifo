@@ -1,2 +1,2 @@
-declare function simple(): number;
-export { simple };
+import { TabSharedThreadpool } from "./tab-shared-threadpool";
+export { TabSharedThreadpool };

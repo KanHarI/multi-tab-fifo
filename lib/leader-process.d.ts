@@ -2,10 +2,10 @@ declare class LeaderProcess<T> {
     private readonly broadcast_channel;
     private readonly channel_name;
     private readonly elector;
-    private readonly unknown_ids;
-    private max_wip_messages;
-    private is_stopped;
     private readonly thread;
+    private readonly unknown_ids;
+    private is_stopped;
+    private max_wip_messages;
     constructor(channel_name: string);
     private gather_known_ids_and_purge_expired;
     private gather_messages_to_shared_queue;

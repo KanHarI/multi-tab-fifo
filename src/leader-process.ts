@@ -12,14 +12,13 @@ import { sleep } from "./sleep";
 import type { uuid } from "./uuid";
 
 class LeaderProcess<T> {
-  // https://www.amitmerchant.com/typescript-private-modifier-vs-ecmascript-hash-private-fields/
   private readonly broadcast_channel: BroadcastChannel;
   private readonly channel_name: string;
   private readonly elector: LeaderElector;
-  private readonly unknown_ids: Record<uuid, number>;
-  private max_wip_messages: number;
-  private is_stopped: boolean;
   private readonly thread: Promise<void>;
+  private readonly unknown_ids: Record<uuid, number>;
+  private is_stopped: boolean;
+  private max_wip_messages: number;
 
   constructor(channel_name: string) {
     this.channel_name = channel_name;

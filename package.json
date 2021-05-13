@@ -1,16 +1,17 @@
 {
-  "name": "multi-tab-fifo",
+  "name": "multi-tab-threadpool",
   "version": "1.0.0",
-  "description": "An implementation of fifo queue between multiple tabs",
+  "description": "An implementation of multi tabs shared threadpool",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KanHarI/multi-tab-fifo"
+    "url": "git+https://github.com/KanHarI/multi-tab-threadpool"
   },
   "keywords": [
     "fifo",
     "tabs",
-    "broadcast-channel"
+    "broadcast-channel",
+    "threadpool"
   ],
   "author": "KanHarI <knaan.harpaz@gmail.com>",
   "license": "MIT",
