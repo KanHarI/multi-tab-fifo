@@ -3,5 +3,6 @@ declare class TabSharedThreadpool {
     constructor(threadpool_name: string);
     private static wrapped_callback;
     push_task(callback: () => Promise<unknown>): void;
+    stop(): Promise<void>;
 }
 export { TabSharedThreadpool };

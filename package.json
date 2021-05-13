@@ -2,7 +2,7 @@
   "name": "multi-tab-threadpool",
   "version": "1.0.0",
   "description": "An implementation of multi tabs shared threadpool",
-  "main": "index.js",
+  "main": "lib/index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/KanHarI/multi-tab-threadpool"
