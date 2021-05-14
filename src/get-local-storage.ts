@@ -1,14 +1,16 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createLocalStorage(): Record<string, any> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let storage_object: Record<string, any> | undefined = undefined;
+  let storage_object: Storage | undefined = undefined;
   if (typeof localStorage === "undefined" || localStorage === null) {
-    storage_object = {};
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const local_storage_module = require("node-localstorage");
+    storage_object = new local_storage_module.LocalStorage("./scratch");
   } else {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    storage_object = (localStorage as unknown) as Record<string, any>;
+    storage_object = localStorage;
   }
-  return storage_object;
+  return storage_object as Storage;
 }
 
 const storageObject = createLocalStorage();

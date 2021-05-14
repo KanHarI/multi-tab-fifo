@@ -4,7 +4,7 @@ class TabSharedThreadpool {
   private readonly fifo_worker: Worker<() => Promise<unknown>>;
   constructor(threadpool_name: string) {
     this.fifo_worker = new Worker<() => Promise<unknown>>(
-      threadpool_name + "_threadpool_channel",
+      threadpool_name + "_threadpool",
       TabSharedThreadpool.wrapped_callback
     );
   }
