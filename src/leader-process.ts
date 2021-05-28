@@ -12,8 +12,8 @@ import {
   LeaderElector,
   createLeaderElection,
 } from "broadcast-channel";
+import { sleep } from "./sleep";
 import { uuid } from "./uuid";
-import {sleep} from "./sleep";
 
 class LeaderProcess {
   private readonly broadcast_channel: BroadcastChannel<BroadcastMessage>;
