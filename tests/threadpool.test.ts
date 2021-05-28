@@ -11,3 +11,13 @@ test("Test tab shared threadpool", async () => {
   await threadpool.stop();
   expect(results).toStrictEqual([0]);
 });
+
+test("Test tab shared threadpool detect completion", async () => {
+  const threadpool = new TabSharedThreadpool("threadpool");
+  const res = await threadpool.push_task_and_await_completion<number>(
+    async () => {
+      return 1;
+    }
+  );
+  expect(res).toBe(1);
+});

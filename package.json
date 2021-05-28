@@ -41,6 +41,6 @@
   "dependencies": {
     "broadcast-channel": "^3.5.3",
     "get-random-values": "^1.2.2",
-    "node-localstorage": "^2.1.6"
+    "ts-deferred": "^1.0.4"
   }
 }

@@ -7,8 +7,12 @@ import {
   RegisterWorkerMessageBody,
   UnregisterWorkerMessageBody,
 } from "./tab-to-leader-interface";
-import {BroadcastChannel, createLeaderElection, LeaderElector,} from "broadcast-channel";
-import {uuid} from "./uuid";
+import {
+  BroadcastChannel,
+  LeaderElector,
+  createLeaderElection,
+} from "broadcast-channel";
+import { uuid } from "./uuid";
 
 class LeaderProcess {
   private readonly broadcast_channel: BroadcastChannel<BroadcastMessage>;

@@ -8,6 +8,7 @@ declare class LeaderProcess {
     private readonly messages_under_processing;
     private readonly incoming_messages;
     private is_stopped;
+    private is_leading;
     private max_wip_messages;
     constructor(channel_name: string);
     private broadcast_message_callback;
