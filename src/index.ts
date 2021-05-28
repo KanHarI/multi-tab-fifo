@@ -1,5 +1,3 @@
-function simple(): number {
-  return 1;
-}
+import { TabSharedThreadpool } from "./tab-shared-threadpool";
 
-export { simple };
+export { TabSharedThreadpool };
