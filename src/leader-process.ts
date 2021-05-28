@@ -202,6 +202,7 @@ class LeaderProcess {
 
   public async stop(): Promise<void> {
     this.is_stopped = true;
+    this.is_leading = false;
     const leader_dying = this.elector.die();
     const broadcast_channel_closing = this.broadcast_channel.close();
     await leader_dying;
