@@ -24,12 +24,14 @@ class LeaderProcess {
   private readonly messages_under_processing: Record<uuid, Set<uuid>>;
   private readonly incoming_messages: Record<uuid, Array<LeaderQueuedItem>>;
   private is_stopped: boolean;
+  private is_leading: boolean;
   private max_wip_messages: number;
 
   constructor(channel_name: string) {
     const leader_channel_name = channel_name + "_leader";
     this.max_wip_messages = 1;
     this.is_stopped = false;
+    this.is_leading = false;
     this.messages_under_processing = {};
     this.incoming_messages = {};
     this.queued_messages = new Array<LeaderQueuedItem>();
@@ -119,7 +121,8 @@ class LeaderProcess {
 
   private async leadership_process(): Promise<void> {
     await this.elector.awaitLeadership();
-    console.log("Initializing leader");
+    console.debug("Initializing leader");
+    this.is_leading = true;
     this.broadcast_channel.onmessage = this.broadcast_message_callback.bind(
       this
     );
@@ -130,13 +133,16 @@ class LeaderProcess {
       message_type: MessageType.LEADER_CREATED,
       message_body: {},
     });
-    console.log("Leader initialized");
+    console.debug("Leader initialized");
   }
 
   public async set_max_concurrent_workers(n: number): Promise<void> {
     this.max_wip_messages = n;
-    await this.pop_available_items();
+    if (this.is_leading) {
+      await this.pop_available_items();
+    }
   }
+
   private gather_incoming_messages_to_queue(): void {
     let selected_worker: null | uuid = null;
     do {
@@ -187,7 +193,7 @@ class LeaderProcess {
       this.messages_under_processing[poped_item.worker_id].add(
         poped_item.item_id
       );
-      console.log(poped_item);
+      console.debug("Leader poping item with id: " + poped_item.item_id);
       await this.broadcast_channel.postMessage({
         message_type: MessageType.POP_ITEM_TO_WORKER,
         message_body: {
@@ -200,6 +206,7 @@ class LeaderProcess {
 
   public async stop(): Promise<void> {
     this.is_stopped = true;
+    this.is_leading = false;
     const leader_dying = this.elector.die();
     const broadcast_channel_closing = this.broadcast_channel.close();
     await leader_dying;
@@ -207,7 +214,7 @@ class LeaderProcess {
     // await this.thread;
     await broadcast_channel_closing;
     await leader_channel_closing;
-    console.log("Exited leader gracefully");
+    console.debug("Exited leader gracefully");
   }
 }
 
