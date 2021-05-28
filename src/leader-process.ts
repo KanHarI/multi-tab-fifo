@@ -7,12 +7,8 @@ import {
   RegisterWorkerMessageBody,
   UnregisterWorkerMessageBody,
 } from "./tab-to-leader-interface";
-import {
-  BroadcastChannel,
-  LeaderElector,
-  createLeaderElection,
-} from "broadcast-channel";
-import { uuid } from "./uuid";
+import {BroadcastChannel, createLeaderElection, LeaderElector,} from "broadcast-channel";
+import {uuid} from "./uuid";
 
 class LeaderProcess {
   private readonly broadcast_channel: BroadcastChannel<BroadcastMessage>;
@@ -24,12 +20,14 @@ class LeaderProcess {
   private readonly messages_under_processing: Record<uuid, Set<uuid>>;
   private readonly incoming_messages: Record<uuid, Array<LeaderQueuedItem>>;
   private is_stopped: boolean;
+  private is_leading: boolean;
   private max_wip_messages: number;
 
   constructor(channel_name: string) {
     const leader_channel_name = channel_name + "_leader";
     this.max_wip_messages = 1;
     this.is_stopped = false;
+    this.is_leading = false;
     this.messages_under_processing = {};
     this.incoming_messages = {};
     this.queued_messages = new Array<LeaderQueuedItem>();
@@ -120,6 +118,7 @@ class LeaderProcess {
   private async leadership_process(): Promise<void> {
     await this.elector.awaitLeadership();
     console.log("Initializing leader");
+    this.is_leading = true;
     this.broadcast_channel.onmessage = this.broadcast_message_callback.bind(
       this
     );
@@ -135,8 +134,11 @@ class LeaderProcess {
 
   public async set_max_concurrent_workers(n: number): Promise<void> {
     this.max_wip_messages = n;
-    await this.pop_available_items();
+    if (this.is_leading) {
+      await this.pop_available_items();
+    }
   }
+
   private gather_incoming_messages_to_queue(): void {
     let selected_worker: null | uuid = null;
     do {
