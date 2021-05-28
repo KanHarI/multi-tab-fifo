@@ -13,6 +13,7 @@ import {
   createLeaderElection,
 } from "broadcast-channel";
 import { uuid } from "./uuid";
+import {sleep} from "./sleep";
 
 class LeaderProcess {
   private readonly broadcast_channel: BroadcastChannel<BroadcastMessage>;
@@ -133,6 +134,7 @@ class LeaderProcess {
       message_type: MessageType.LEADER_CREATED,
       message_body: {},
     });
+    await sleep(100); // Wait for workers to update leader with their tasks
     console.debug("Leader initialized");
   }
 
