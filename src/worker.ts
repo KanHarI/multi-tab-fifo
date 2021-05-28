@@ -50,6 +50,7 @@ class Worker<T> {
     } catch (error) {
       this.queued_promiese[item.item_id].reject(error);
     } finally {
+      delete this.queued_promiese[item.item_id];
       if (!this.is_stopped) {
         await this.broadcast_channel.postMessage({
           message_type: MessageType.ITEM_PROCESSING_DONE_FROM_WORKER,
@@ -57,7 +58,6 @@ class Worker<T> {
         });
       }
     }
-    console.debug("Exited message processing gracefully");
   }
   private async pop_item(ev: BroadcastMessage): Promise<void> {
     const pop_item_to_worker_message_body: PopItemMessageBody = ev.message_body as PopItemMessageBody;
@@ -169,6 +169,9 @@ class Worker<T> {
     await this.registration_thread;
     await broadcast_channel_stop;
     await leader_process_stop;
+    for (const item_id of Object.keys(this.queued_promiese)) {
+      await this.queued_promiese[item_id].promise;
+    }
     console.debug("Exited worker gracefully");
   }
 }

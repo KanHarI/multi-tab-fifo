@@ -19,5 +19,6 @@ test("Test tab shared threadpool detect completion", async () => {
       return 1;
     }
   );
+  await threadpool.stop();
   expect(res).toBe(1);
 });
