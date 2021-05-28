@@ -1,54 +1,81 @@
 import type { uuid } from "./uuid";
 
-const TICK_TIME_MS = 10;
-const TICKS_TO_DELETE_DEAD_ID = 10;
-
-type time_ms = number;
-
-interface Message<T> {
-  message_id: uuid;
+interface QueuedItem<T> {
+  item_id: uuid;
   data: T;
+  date: number;
 }
 
-interface QueuedMessage<T> {
+interface LeaderQueuedItem {
   worker_id: uuid;
-  message: Message<T>;
+  item_id: uuid;
+  date: number;
 }
 
-interface TabToLeaderInterface<T> {
-  is_init: boolean;
-  heartbeat: Record<uuid, time_ms>;
-  incoming_messages: Record<uuid, Array<Message<T>>>; // Tabs push, leader pops
-  message_queue: Array<QueuedMessage<T>>; // leader push, leader pop
-  ready_messages: Record<uuid, Array<Message<T>>>; // leader push, tab pop
-  in_process_messages: Record<uuid, Array<Message<T>>>; // tab push, tab pop
+enum MessageType {
+  LEADER_CREATED,
+  REGISTER_WORKER,
+  UNREGISTER_WORKER,
+  ADD_ITEM_FROM_WORKER,
+  POP_ITEM_TO_WORKER,
+  ITEM_PROCESSING_DONE_FROM_WORKER,
+  INFORM_WIP_IN_WORKER,
 }
 
-function purge_id<T>(ttli: TabToLeaderInterface<T>, id: uuid): void {
-  delete ttli.heartbeat[id];
-  delete ttli.incoming_messages[id];
-  ttli.message_queue = ttli.message_queue.filter(
-    (message: QueuedMessage<T>) => message.worker_id != id
-  );
-  delete ttli.ready_messages[id];
-  delete ttli.in_process_messages[id];
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+interface LeaderCreatedMessageBody {}
+
+interface RegisterWorkerMessageBody {
+  worker_id: uuid;
 }
 
-function get_wip_message_count<T>(ttli: TabToLeaderInterface<T>): number {
-  let wip_messages_counter = 0;
-  for (const id of Object.keys(ttli.ready_messages)) {
-    wip_messages_counter += ttli.ready_messages[id].length;
-  }
-  for (const id of Object.keys(ttli.in_process_messages)) {
-    wip_messages_counter += ttli.in_process_messages[id].length;
-  }
-  return wip_messages_counter;
+interface UnregisterWorkerMessageBody {
+  worker_id: uuid;
 }
 
-export type { QueuedMessage, TabToLeaderInterface, Message };
+interface AddItemMessageBody {
+  date: number;
+  worker_id: uuid;
+  item_id: uuid;
+}
+
+interface PopItemMessageBody {
+  worker_id: uuid;
+  item_id: uuid;
+}
+
+interface ItemProcessingDoneFromWorkerMessageBody {
+  worker_id: uuid;
+  item_id: uuid;
+}
+
+interface InformWipInWorkerMessageBody {
+  worker_id: uuid;
+  item_id: uuid;
+}
+
+interface BroadcastMessage {
+  message_type: MessageType;
+  message_body:
+    | LeaderCreatedMessageBody
+    | RegisterWorkerMessageBody
+    | UnregisterWorkerMessageBody
+    | AddItemMessageBody
+    | PopItemMessageBody
+    | ItemProcessingDoneFromWorkerMessageBody
+    | InformWipInWorkerMessageBody;
+}
+
 export {
-  TICK_TIME_MS,
-  TICKS_TO_DELETE_DEAD_ID,
-  purge_id,
-  get_wip_message_count,
+  QueuedItem,
+  LeaderQueuedItem,
+  MessageType,
+  LeaderCreatedMessageBody,
+  RegisterWorkerMessageBody,
+  UnregisterWorkerMessageBody,
+  AddItemMessageBody,
+  PopItemMessageBody,
+  ItemProcessingDoneFromWorkerMessageBody,
+  BroadcastMessage,
+  InformWipInWorkerMessageBody,
 };

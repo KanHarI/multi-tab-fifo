@@ -1,116 +1,152 @@
-import type { Message, TabToLeaderInterface } from "./tab-to-leader-interface";
-import { TICK_TIME_MS, purge_id } from "./tab-to-leader-interface";
+import {
+  BroadcastMessage,
+  MessageType,
+  PopItemMessageBody,
+  QueuedItem,
+} from "./tab-to-leader-interface";
+import { generate_uuid, uuid } from "./uuid";
+import { BroadcastChannel } from "broadcast-channel";
 import { LeaderProcess } from "./leader-process";
-import { generate_uuid } from "./uuid";
-import { get_local_storage } from "./get-local-storage";
-import { sleep } from "./sleep";
-import type { uuid } from "./uuid";
 
 class Worker<T> {
+  private readonly broadcast_channel: BroadcastChannel<BroadcastMessage>;
   private readonly callback: (arg: T) => Promise<void>;
-  private readonly channel_name: string;
-  private readonly id: uuid;
-  private readonly leader_process: LeaderProcess<T>;
-  private readonly thread: Promise<void>;
-  private readonly waiting_for_leader: Array<Message<T>>;
+  private readonly worker_id: uuid;
+  private readonly leader_process: LeaderProcess;
+  private readonly processing_messages: Record<uuid, QueuedItem<T>>;
+  private readonly queued_items: Record<uuid, QueuedItem<T>>;
+  private registration_thread: Promise<void>;
   private is_stopped: boolean;
-  private processing_messages: Array<Message<T>>;
-  private queued_messages: Array<Message<T>>;
 
   constructor(channel_name: string, callback: (arg: T) => Promise<void>) {
     this.callback = callback;
-    this.channel_name = channel_name;
-    this.id = generate_uuid();
-    this.waiting_for_leader = [];
-    this.queued_messages = [];
-    this.processing_messages = [];
+    this.broadcast_channel = new BroadcastChannel<BroadcastMessage>(
+      channel_name
+    );
+    this.worker_id = generate_uuid();
+    this.queued_items = {};
+    this.processing_messages = {};
     this.is_stopped = false;
-    this.leader_process = new LeaderProcess<T>(channel_name);
-    this.thread = this.worker_process();
+    this.leader_process = new LeaderProcess(channel_name);
+    this.broadcast_channel.onmessage = this.broadcast_message_callback.bind(
+      this
+    );
+    this.registration_thread = this.register_worker_in_leader();
+    if (globalThis.addEventListener != undefined) {
+      globalThis.addEventListener("beforeunload", this.stop.bind(this));
+    }
   }
 
-  private async process_message(message: Message<T>) {
-    const shared_object = get_local_storage();
-    let leader_object: TabToLeaderInterface<T> =
-      shared_object[this.channel_name];
-    leader_object.in_process_messages[this.id].push(message);
+  private async process_item(item: QueuedItem<T>) {
     try {
-      await this.callback(message.data);
+      await this.callback(item.data);
     } finally {
-      leader_object = shared_object[this.channel_name];
-      leader_object.in_process_messages[
-        this.id
-      ] = leader_object.in_process_messages[this.id].filter(
-        (queued_message: Message<T>) =>
-          queued_message.message_id != message.message_id
-      );
-      this.processing_messages = this.processing_messages.filter(
-        (_message: Message<T>) => _message.message_id != message.message_id
-      );
+      this.broadcast_channel.postMessage({
+        message_type: MessageType.ITEM_PROCESSING_DONE_FROM_WORKER,
+        message_body: { worker_id: this.worker_id, item_id: item.item_id },
+      });
     }
     console.log("Exited message processing gracefuly");
   }
+  private pop_item(ev: BroadcastMessage): void {
+    console.log(ev);
+    const pop_item_to_worker_message_body: PopItemMessageBody = ev.message_body as PopItemMessageBody;
+    if (pop_item_to_worker_message_body.worker_id != this.worker_id) {
+      return;
+    }
+    const poped_item = this.queued_items[
+      pop_item_to_worker_message_body.item_id
+    ];
+    delete this.queued_items[pop_item_to_worker_message_body.item_id];
+    this.processing_messages[poped_item.item_id] = poped_item;
+    this.process_item(poped_item);
+  }
 
-  private async worker_process(): Promise<void> {
-    const storageObject = get_local_storage();
-    while (!this.is_stopped) {
-      const leader_inerface: TabToLeaderInterface<T> | undefined =
-        storageObject[this.channel_name];
-      if (leader_inerface != undefined && leader_inerface.is_init) {
-        if (leader_inerface.heartbeat[this.id] == undefined) {
-          console.log("Initializing worker info");
-          leader_inerface.incoming_messages[this.id] = [
-            ...this.queued_messages,
-          ];
-          leader_inerface.ready_messages[this.id] = [];
-          leader_inerface.in_process_messages[
-            this.id
-          ] = this.processing_messages;
-        }
-        leader_inerface.heartbeat[this.id] = Date.now();
-        let message: Message<T> | undefined = undefined;
-        while ((message = this.waiting_for_leader.shift()) != undefined) {
-          console.log("Pushed message with data " + message.data);
-          leader_inerface.incoming_messages[this.id].push(message);
-          this.queued_messages.push(message);
-        }
-        while (
-          (message = leader_inerface.ready_messages[this.id].shift()) !=
-          undefined
-        ) {
-          console.log("Processing message with data " + message.data);
-          const removed_id = message.message_id;
-          this.queued_messages = this.queued_messages.filter(
-            (_message: Message<T>) => _message.message_id != removed_id
-          );
-          this.processing_messages.push(message);
-          this.process_message(message);
-        }
-      }
-      await sleep(TICK_TIME_MS);
+  private async register_worker_in_leader(): Promise<void> {
+    await this.broadcast_channel.postMessage({
+      message_type: MessageType.REGISTER_WORKER,
+      message_body: { worker_id: this.worker_id },
+    });
+    for (const item_id of Object.keys(this.queued_items)) {
+      await this.broadcast_channel.postMessage({
+        message_type: MessageType.ADD_ITEM_FROM_WORKER,
+        message_body: {
+          worker_id: this.worker_id,
+          item_id: item_id,
+          date: this.queued_items[item_id].date,
+        },
+      });
+    }
+    for (const item_id of Object.keys(this.processing_messages)) {
+      await this.broadcast_channel.postMessage({
+        message_type: MessageType.INFORM_WIP_IN_WORKER,
+        message_body: { worker_id: this.worker_id, item_id: item_id },
+      });
     }
   }
 
-  public set_max_concurrent_workers(n: number): void {
-    this.leader_process.set_max_concurrent_workers(n);
+  private async broadcast_message_callback(ev: BroadcastMessage) {
+    await this.registration_thread; // Do not collide with registration
+    switch (ev.message_type) {
+      case MessageType.ITEM_PROCESSING_DONE_FROM_WORKER:
+      case MessageType.REGISTER_WORKER:
+      case MessageType.UNREGISTER_WORKER:
+      case MessageType.ADD_ITEM_FROM_WORKER:
+      case MessageType.INFORM_WIP_IN_WORKER:
+        break;
+      case MessageType.LEADER_CREATED:
+        this.registration_thread = this.register_worker_in_leader();
+        break;
+      case MessageType.POP_ITEM_TO_WORKER:
+        this.pop_item(ev);
+        break;
+    }
   }
 
-  public push_message(data: T): void {
+  public async set_max_concurrent_workers(n: number): Promise<void> {
+    if (this.is_stopped) {
+      return;
+    }
+    await this.registration_thread; // Do not collide with registration
+    await this.leader_process.set_max_concurrent_workers(n);
+  }
+
+  public async push_message(data: T): Promise<void> {
+    if (this.is_stopped) {
+      return;
+    }
+    await this.registration_thread; // Do not collide with registration
     console.log("Prepushing message with data " + data);
-    const message: Message<T> = { message_id: generate_uuid(), data: data };
-    this.waiting_for_leader.push(message);
+    const queued_item: QueuedItem<T> = {
+      item_id: generate_uuid(),
+      date: Date.now(),
+      data: data,
+    };
+    this.queued_items[queued_item.item_id] = queued_item;
+    this.broadcast_channel.postMessage({
+      message_type: MessageType.ADD_ITEM_FROM_WORKER,
+      message_body: {
+        worker_id: this.worker_id,
+        item_id: queued_item.item_id,
+        date: queued_item.date,
+      },
+    });
   }
 
   public async stop(): Promise<void> {
-    this.is_stopped = true;
-    await this.leader_process.stop();
-    await this.thread;
-    const storageObject = get_local_storage();
-    const leader_inerface: TabToLeaderInterface<T> | undefined =
-      storageObject[this.channel_name];
-    if (leader_inerface != undefined) {
-      purge_id(leader_inerface, this.id);
+    if (this.is_stopped) {
+      return;
     }
+    this.is_stopped = true;
+    await this.broadcast_channel.postMessage({
+      message_type: MessageType.UNREGISTER_WORKER,
+      message_body: { worker_id: this.worker_id },
+    });
+    const broadcast_channel_stop = this.broadcast_channel.close();
+    const leader_process_stop = this.leader_process.stop();
+    await this.registration_thread;
+    await broadcast_channel_stop;
+    await leader_process_stop;
     console.log("Exited worker gracefully");
   }
 }

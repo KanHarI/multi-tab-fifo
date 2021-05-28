@@ -1,24 +1,50 @@
 import type { uuid } from "./uuid";
-declare const TICK_TIME_MS = 10;
-declare const TICKS_TO_DELETE_DEAD_ID = 10;
-declare type time_ms = number;
-interface Message<T> {
-    message_id: uuid;
+interface QueuedItem<T> {
+    item_id: uuid;
     data: T;
+    date: number;
 }
-interface QueuedMessage<T> {
+interface LeaderQueuedItem {
     worker_id: uuid;
-    message: Message<T>;
+    item_id: uuid;
+    date: number;
 }
-interface TabToLeaderInterface<T> {
-    is_init: boolean;
-    heartbeat: Record<uuid, time_ms>;
-    incoming_messages: Record<uuid, Array<Message<T>>>;
-    message_queue: Array<QueuedMessage<T>>;
-    ready_messages: Record<uuid, Array<Message<T>>>;
-    in_process_messages: Record<uuid, Array<Message<T>>>;
+declare enum MessageType {
+    LEADER_CREATED = 0,
+    REGISTER_WORKER = 1,
+    UNREGISTER_WORKER = 2,
+    ADD_ITEM_FROM_WORKER = 3,
+    POP_ITEM_TO_WORKER = 4,
+    ITEM_PROCESSING_DONE_FROM_WORKER = 5,
+    INFORM_WIP_IN_WORKER = 6
 }
-declare function purge_id<T>(ttli: TabToLeaderInterface<T>, id: uuid): void;
-declare function get_wip_message_count<T>(ttli: TabToLeaderInterface<T>): number;
-export type { QueuedMessage, TabToLeaderInterface, Message };
-export { TICK_TIME_MS, TICKS_TO_DELETE_DEAD_ID, purge_id, get_wip_message_count, };
+interface LeaderCreatedMessageBody {
+}
+interface RegisterWorkerMessageBody {
+    worker_id: uuid;
+}
+interface UnregisterWorkerMessageBody {
+    worker_id: uuid;
+}
+interface AddItemMessageBody {
+    date: number;
+    worker_id: uuid;
+    item_id: uuid;
+}
+interface PopItemMessageBody {
+    worker_id: uuid;
+    item_id: uuid;
+}
+interface ItemProcessingDoneFromWorkerMessageBody {
+    worker_id: uuid;
+    item_id: uuid;
+}
+interface InformWipInWorkerMessageBody {
+    worker_id: uuid;
+    item_id: uuid;
+}
+interface BroadcastMessage {
+    message_type: MessageType;
+    message_body: LeaderCreatedMessageBody | RegisterWorkerMessageBody | UnregisterWorkerMessageBody | AddItemMessageBody | PopItemMessageBody | ItemProcessingDoneFromWorkerMessageBody | InformWipInWorkerMessageBody;
+}
+export { QueuedItem, LeaderQueuedItem, MessageType, LeaderCreatedMessageBody, RegisterWorkerMessageBody, UnregisterWorkerMessageBody, AddItemMessageBody, PopItemMessageBody, ItemProcessingDoneFromWorkerMessageBody, BroadcastMessage, InformWipInWorkerMessageBody, };
