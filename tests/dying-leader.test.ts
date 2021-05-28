@@ -46,7 +46,6 @@ for (const leader_death of [
       await w1.stop(); // Leader swap
       await sleep(4500 - leader_death);
       await w2.stop();
-      console.log(completed_callbacks);
       expect(completed_callbacks).toStrictEqual([1, 2, 3]);
     },
     15000

@@ -121,7 +121,7 @@ class LeaderProcess {
 
   private async leadership_process(): Promise<void> {
     await this.elector.awaitLeadership();
-    console.log("Initializing leader");
+    console.debug("Initializing leader");
     this.is_leading = true;
     this.broadcast_channel.onmessage = this.broadcast_message_callback.bind(
       this
@@ -133,7 +133,7 @@ class LeaderProcess {
       message_type: MessageType.LEADER_CREATED,
       message_body: {},
     });
-    console.log("Leader initialized");
+    console.debug("Leader initialized");
   }
 
   public async set_max_concurrent_workers(n: number): Promise<void> {
@@ -193,7 +193,7 @@ class LeaderProcess {
       this.messages_under_processing[poped_item.worker_id].add(
         poped_item.item_id
       );
-      console.log(poped_item);
+      console.debug("Leader poping item with id: " + poped_item.item_id);
       await this.broadcast_channel.postMessage({
         message_type: MessageType.POP_ITEM_TO_WORKER,
         message_body: {
@@ -214,7 +214,7 @@ class LeaderProcess {
     // await this.thread;
     await broadcast_channel_closing;
     await leader_channel_closing;
-    console.log("Exited leader gracefully");
+    console.debug("Exited leader gracefully");
   }
 }
 

@@ -57,10 +57,9 @@ class Worker<T> {
         });
       }
     }
-    console.log("Exited message processing gracefully");
+    console.debug("Exited message processing gracefully");
   }
   private async pop_item(ev: BroadcastMessage): Promise<void> {
-    console.log(ev);
     const pop_item_to_worker_message_body: PopItemMessageBody = ev.message_body as PopItemMessageBody;
     if (pop_item_to_worker_message_body.worker_id != this.worker_id) {
       return;
@@ -127,12 +126,12 @@ class Worker<T> {
       return undefined;
     }
     await this.registration_thread; // Do not collide with registration
-    console.log("Prepushing message with data " + data);
     const queued_item: QueuedItem<T> = {
       item_id: generate_uuid(),
       date: Date.now(),
       data: data,
     };
+    console.debug("Prepushing message with id: " + queued_item.item_id);
     this.queued_items[queued_item.item_id] = queued_item;
     this.queued_promiese[queued_item.item_id] = new Deferred<unknown>();
     await this.broadcast_channel.postMessage({
@@ -170,7 +169,7 @@ class Worker<T> {
     await this.registration_thread;
     await broadcast_channel_stop;
     await leader_process_stop;
-    console.log("Exited worker gracefully");
+    console.debug("Exited worker gracefully");
   }
 }
 
