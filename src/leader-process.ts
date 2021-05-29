@@ -12,6 +12,7 @@ import {
   LeaderElector,
   createLeaderElection,
 } from "broadcast-channel";
+import { sleep } from "./sleep";
 import { uuid } from "./uuid";
 
 class LeaderProcess {
@@ -73,6 +74,7 @@ class LeaderProcess {
   private async item_processing_done(ev: BroadcastMessage): Promise<void> {
     const item_done_message_data: ItemProcessingDoneFromWorkerMessageBody = ev.message_body as ItemProcessingDoneFromWorkerMessageBody;
     if (this.worker_ids.has(item_done_message_data.worker_id)) {
+      console.debug("God done message for: " + item_done_message_data.item_id);
       this.messages_under_processing[item_done_message_data.worker_id].delete(
         item_done_message_data.item_id
       );
@@ -133,6 +135,7 @@ class LeaderProcess {
       message_type: MessageType.LEADER_CREATED,
       message_body: {},
     });
+    await sleep(100); // Wait for workers to update leader with their tasks
     console.debug("Leader initialized");
   }
 
