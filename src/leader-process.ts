@@ -12,6 +12,7 @@ import {
   LeaderElector,
   createLeaderElection,
 } from "broadcast-channel";
+import { Deferred } from "ts-deferred";
 import { sleep } from "./sleep";
 import { uuid } from "./uuid";
 
@@ -19,28 +20,36 @@ class LeaderProcess {
   private readonly broadcast_channel: BroadcastChannel<BroadcastMessage>;
   private readonly leader_channel: BroadcastChannel<BroadcastMessage>;
   private readonly elector: LeaderElector;
-  private readonly thread: Promise<void>;
+  private readonly startup_thread: Promise<void>;
   private readonly worker_ids: Set<uuid>;
-  private readonly queued_messages: Array<LeaderQueuedItem>;
+  private readonly queued_messages_by_priority: Record<
+    number,
+    Array<LeaderQueuedItem>
+  >;
   private readonly messages_under_processing: Record<uuid, Set<uuid>>;
-  private readonly incoming_messages: Record<uuid, Array<LeaderQueuedItem>>;
+  private readonly incoming_messages_by_priority_then_worker_id: Record<
+    number,
+    Record<uuid, Array<LeaderQueuedItem>>
+  >;
   private is_stopped: boolean;
-  private is_leading: boolean;
+  private _is_leading: boolean;
   private max_wip_messages: number;
+  private readonly stopper_deferred: Deferred<void>;
 
   constructor(channel_name: string) {
     const leader_channel_name = channel_name + "_leader";
     this.max_wip_messages = 1;
     this.is_stopped = false;
-    this.is_leading = false;
+    this._is_leading = false;
     this.messages_under_processing = {};
-    this.incoming_messages = {};
-    this.queued_messages = new Array<LeaderQueuedItem>();
+    this.incoming_messages_by_priority_then_worker_id = {};
+    this.queued_messages_by_priority = {};
     this.worker_ids = new Set<uuid>();
     this.broadcast_channel = new BroadcastChannel(channel_name);
     this.leader_channel = new BroadcastChannel(leader_channel_name);
     this.elector = createLeaderElection(this.broadcast_channel);
-    this.thread = this.leadership_process();
+    this.stopper_deferred = new Deferred<void>();
+    this.startup_thread = this.leadership_process();
   }
 
   private async broadcast_message_callback(
@@ -87,9 +96,27 @@ class LeaderProcess {
   private async add_item_from_worker(ev: BroadcastMessage): Promise<void> {
     const add_item_message_data: AddItemMessageBody = ev.message_body as AddItemMessageBody;
     if (this.worker_ids.has(add_item_message_data.worker_id)) {
-      this.incoming_messages[add_item_message_data.worker_id].push(
-        add_item_message_data
-      );
+      if (
+        this.incoming_messages_by_priority_then_worker_id[
+          add_item_message_data.priority
+        ] == undefined
+      ) {
+        this.incoming_messages_by_priority_then_worker_id[
+          add_item_message_data.priority
+        ] = {};
+      }
+      if (
+        this.incoming_messages_by_priority_then_worker_id[
+          add_item_message_data.priority
+        ][add_item_message_data.worker_id] == undefined
+      ) {
+        this.incoming_messages_by_priority_then_worker_id[
+          add_item_message_data.priority
+        ][add_item_message_data.worker_id] = new Array<LeaderQueuedItem>();
+      }
+      this.incoming_messages_by_priority_then_worker_id[
+        add_item_message_data.priority
+      ][add_item_message_data.worker_id].push(add_item_message_data);
       await this.pop_available_items();
     } else {
       console.error("Unknown worker detected");
@@ -103,7 +130,6 @@ class LeaderProcess {
       delete this.messages_under_processing[
         unregister_worker_message_body.worker_id
       ];
-      delete this.incoming_messages[unregister_worker_message_body.worker_id];
       await this.pop_available_items();
     } else {
       console.error("Unknown worker detected");
@@ -116,21 +142,21 @@ class LeaderProcess {
     this.messages_under_processing[
       register_worker_message_data.worker_id
     ] = new Set<uuid>();
-    this.incoming_messages[
-      register_worker_message_data.worker_id
-    ] = new Array<LeaderQueuedItem>();
   }
 
   private async leadership_process(): Promise<void> {
-    await this.elector.awaitLeadership();
-    console.debug("Initializing leader");
-    this.is_leading = true;
-    this.broadcast_channel.onmessage = this.broadcast_message_callback.bind(
-      this
-    );
+    await Promise.race([
+      this.elector.awaitLeadership(),
+      this.stopper_deferred.promise,
+    ]);
     if (this.is_stopped) {
       return;
     }
+    console.debug("Initializing leader");
+    this._is_leading = true;
+    this.broadcast_channel.onmessage = this.broadcast_message_callback.bind(
+      this
+    );
     await this.broadcast_channel.postMessage({
       message_type: MessageType.LEADER_CREATED,
       message_body: {},
@@ -141,37 +167,69 @@ class LeaderProcess {
 
   public async set_max_concurrent_workers(n: number): Promise<void> {
     this.max_wip_messages = n;
-    if (this.is_leading) {
+    if (this._is_leading) {
       await this.pop_available_items();
     }
   }
 
-  private gather_incoming_messages_to_queue(): void {
-    let selected_worker: null | uuid = null;
-    do {
-      selected_worker = null;
-      for (const worker_id of Object.keys(this.incoming_messages)) {
-        if (this.incoming_messages[worker_id].length == 0) {
+  private gather_single_item(): boolean {
+    const priorities: Array<number> = Object.keys(
+      this.incoming_messages_by_priority_then_worker_id
+    ).map((x) => Number(x));
+    priorities.sort();
+    for (const priority of priorities) {
+      let poped_worker: undefined | uuid = undefined;
+      for (const worker_id of Object.keys(
+        this.incoming_messages_by_priority_then_worker_id[priority]
+      )) {
+        if (
+          this.incoming_messages_by_priority_then_worker_id[priority][worker_id]
+            .length == 0
+        ) {
+          delete this.incoming_messages_by_priority_then_worker_id[priority][
+            worker_id
+          ];
           continue;
         }
-        if (selected_worker == null) {
-          selected_worker = worker_id;
+        if (poped_worker == undefined) {
+          poped_worker = worker_id;
           continue;
         }
         if (
-          this.incoming_messages[worker_id][0].date <
-          this.incoming_messages[selected_worker][0].date
+          this.incoming_messages_by_priority_then_worker_id[priority][
+            worker_id
+          ][0].date <
+          this.incoming_messages_by_priority_then_worker_id[priority][
+            poped_worker
+          ][0].date
         ) {
-          selected_worker = worker_id;
+          poped_worker = worker_id;
         }
       }
-      if (selected_worker != null) {
-        // This is safe as we know this.incoming_messages[selected_worker] is not empty
-        this.queued_messages.push(
-          this.incoming_messages[selected_worker].shift() as LeaderQueuedItem
-        );
+      if (poped_worker == undefined) {
+        delete this.incoming_messages_by_priority_then_worker_id[priority];
+        continue;
       }
-    } while (selected_worker != null);
+      if (this.queued_messages_by_priority[priority] == undefined) {
+        this.queued_messages_by_priority[
+          priority
+        ] = new Array<LeaderQueuedItem>();
+      }
+      // This is OK as we know this.incoming_messages[priority][poped_worker] is not empty
+      this.queued_messages_by_priority[priority].push(
+        this.incoming_messages_by_priority_then_worker_id[priority][
+          poped_worker
+        ].shift() as LeaderQueuedItem
+      );
+      return true;
+    }
+    return false;
+  }
+
+  private gather_incoming_messages_to_queue(): void {
+    while (this.gather_single_item()) {
+      // Blank on purpose
+    }
   }
 
   private count_wip_messages(): number {
@@ -184,35 +242,62 @@ class LeaderProcess {
 
   private async pop_available_items(): Promise<void> {
     this.gather_incoming_messages_to_queue();
-    const num_wip_messages = this.count_wip_messages();
+    let num_wip_messages = this.count_wip_messages();
+    const poped_callbacks: Array<Promise<void>> = new Array<Promise<void>>();
     while (num_wip_messages < this.max_wip_messages) {
-      const poped_item = this.queued_messages.shift();
-      if (poped_item == undefined) {
+      const current_priorities: Array<number> = Object.keys(
+        this.queued_messages_by_priority
+      ).map((x) => Number(x));
+      if (current_priorities.length == 0) {
+        // No messages to pop
         break;
       }
-      if (!this.worker_ids.has(poped_item.worker_id)) {
-        continue;
+      current_priorities.sort();
+      for (const priority of current_priorities) {
+        if (this.queued_messages_by_priority[priority].length == 0) {
+          delete this.queued_messages_by_priority[priority];
+          continue;
+        }
+        // Safe as we know this.queued_messages[priority] is not empty
+        const poped_item = this.queued_messages_by_priority[
+          priority
+        ].shift() as LeaderQueuedItem;
+        if (!this.worker_ids.has(poped_item.worker_id)) {
+          continue;
+        }
+        console.debug("Leader popping item with id: " + poped_item.item_id);
+        this.messages_under_processing[poped_item.worker_id].add(
+          poped_item.item_id
+        );
+        poped_callbacks.push(
+          this.broadcast_channel.postMessage({
+            message_type: MessageType.POP_ITEM_TO_WORKER,
+            message_body: {
+              worker_id: poped_item.worker_id,
+              item_id: poped_item.item_id,
+            },
+          })
+        );
+        num_wip_messages++;
+        break;
       }
-      this.messages_under_processing[poped_item.worker_id].add(
-        poped_item.item_id
-      );
-      console.debug("Leader poping item with id: " + poped_item.item_id);
-      await this.broadcast_channel.postMessage({
-        message_type: MessageType.POP_ITEM_TO_WORKER,
-        message_body: {
-          worker_id: poped_item.worker_id,
-          item_id: poped_item.item_id,
-        },
-      });
     }
+    for (const callback of poped_callbacks) {
+      await callback;
+    }
+  }
+
+  public is_leading(): boolean {
+    return this._is_leading;
   }
 
   public async stop(): Promise<void> {
     this.is_stopped = true;
-    this.is_leading = false;
-    const leader_dying = this.elector.die();
+    this.stopper_deferred.resolve();
+    await this.startup_thread;
+    this._is_leading = false;
+    await this.elector.die();
     const broadcast_channel_closing = this.broadcast_channel.close();
-    await leader_dying;
     const leader_channel_closing = this.leader_channel.close();
     // await this.thread;
     await broadcast_channel_closing;

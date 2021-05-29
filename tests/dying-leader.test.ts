@@ -1,25 +1,7 @@
 import { Worker } from "../src/worker";
 import { sleep } from "../src/sleep";
 
-for (const leader_death of [
-  5,
-  15,
-  25,
-  35,
-  45,
-  55,
-  400,
-  1000,
-  1005,
-  1015,
-  1025,
-  1035,
-  1045,
-  1055,
-  1200,
-  1800,
-  2500,
-]) {
+for (const leader_death of [5, 15, 25, 35, 85, 95, 105, 135, 285, 295, 305]) {
   test(
     "Dying leader " + leader_death,
     async () => {
@@ -27,7 +9,7 @@ for (const leader_death of [
       const w1 = new Worker<number>(
         "dying_leader_" + leader_death,
         async (x) => {
-          await sleep(1000);
+          await sleep(200);
           completed_callbacks.push(x);
         }
       );
@@ -35,16 +17,19 @@ for (const leader_death of [
       const w2 = new Worker<number>(
         "dying_leader" + leader_death,
         async (x) => {
-          await sleep(1000);
+          await sleep(200);
           completed_callbacks.push(x);
         }
       );
+      expect(w1.is_leading()).toBe(true);
+      expect(w2.is_leading()).toBe(false);
       w2.push_message(1);
       w2.push_message(2);
       w2.push_message(3);
       await sleep(leader_death);
       await w1.stop(); // Leader swap
-      await sleep(4500 - leader_death);
+      await sleep(2000 - leader_death);
+      expect(w2.is_leading()).toBe(true);
       await w2.stop();
       expect(completed_callbacks).toStrictEqual([1, 2, 3]);
     },

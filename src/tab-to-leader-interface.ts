@@ -4,12 +4,14 @@ interface QueuedItem<T> {
   item_id: uuid;
   data: T;
   date: number;
+  priority: number;
 }
 
 interface LeaderQueuedItem {
   worker_id: uuid;
   item_id: uuid;
   date: number;
+  priority: number;
 }
 
 enum MessageType {
@@ -37,6 +39,7 @@ interface AddItemMessageBody {
   date: number;
   worker_id: uuid;
   item_id: uuid;
+  priority: number;
 }
 
 interface PopItemMessageBody {

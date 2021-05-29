@@ -74,6 +74,7 @@ class Worker<T> {
   }
 
   private async register_worker_in_leader(): Promise<void> {
+    console.debug("Registering worker " + this.worker_id + " in leader");
     await this.broadcast_channel.postMessage({
       message_type: MessageType.REGISTER_WORKER,
       message_body: { worker_id: this.worker_id },
@@ -85,6 +86,7 @@ class Worker<T> {
           worker_id: this.worker_id,
           item_id: item_id,
           date: this.queued_items[item_id].date,
+          priority: this.queued_items[item_id].priority,
         },
       });
     }
@@ -109,7 +111,7 @@ class Worker<T> {
         this.registration_thread = this.register_worker_in_leader();
         break;
       case MessageType.POP_ITEM_TO_WORKER:
-        this.pop_item(ev);
+        await this.pop_item(ev);
         break;
     }
   }
@@ -122,7 +124,10 @@ class Worker<T> {
     await this.leader_process.set_max_concurrent_workers(n);
   }
 
-  public async push_message(data: T): Promise<Promise<unknown> | undefined> {
+  public async push_message(
+    data: T,
+    priority = 0
+  ): Promise<Deferred<unknown> | undefined> {
     if (this.is_stopped) {
       return undefined;
     }
@@ -131,6 +136,7 @@ class Worker<T> {
       item_id: generate_uuid(),
       date: Date.now(),
       data: data,
+      priority: priority,
     };
     console.debug("Prepushing message with id: " + queued_item.item_id);
     this.queued_items[queued_item.item_id] = queued_item;
@@ -141,19 +147,14 @@ class Worker<T> {
         worker_id: this.worker_id,
         item_id: queued_item.item_id,
         date: queued_item.date,
+        priority: queued_item.priority,
       },
     });
-    return this.queued_promiese[queued_item.item_id].promise;
+    return this.queued_promiese[queued_item.item_id];
   }
 
-  public async push_message_and_wait_for_completion(
-    data: T
-  ): Promise<unknown | undefined> {
-    const promise = this.push_message(data);
-    if (promise == undefined) {
-      return undefined;
-    }
-    return await promise;
+  public is_leading(): boolean {
+    return this.leader_process.is_leading();
   }
 
   public async stop(): Promise<void> {

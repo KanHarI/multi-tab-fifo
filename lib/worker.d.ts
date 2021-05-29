@@ -1,4 +1,5 @@
 import { uuid } from "./uuid";
+import { Deferred } from "ts-deferred";
 declare class Worker<T> {
     private readonly broadcast_channel;
     private readonly callback;
@@ -15,8 +16,8 @@ declare class Worker<T> {
     private register_worker_in_leader;
     private broadcast_message_callback;
     set_max_concurrent_workers(n: number): Promise<void>;
-    push_message(data: T): Promise<Promise<unknown> | undefined>;
-    push_message_and_wait_for_completion(data: T): Promise<unknown | undefined>;
+    push_message(data: T, priority?: number): Promise<Deferred<unknown> | undefined>;
+    is_leading(): boolean;
     stop(): Promise<void>;
 }
 export { Worker };
