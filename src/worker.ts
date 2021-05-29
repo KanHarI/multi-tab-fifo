@@ -74,6 +74,7 @@ class Worker<T> {
   }
 
   private async register_worker_in_leader(): Promise<void> {
+    console.debug("Registering worker " + this.worker_id + " in leader");
     await this.broadcast_channel.postMessage({
       message_type: MessageType.REGISTER_WORKER,
       message_body: { worker_id: this.worker_id },
@@ -110,7 +111,7 @@ class Worker<T> {
         this.registration_thread = this.register_worker_in_leader();
         break;
       case MessageType.POP_ITEM_TO_WORKER:
-        this.pop_item(ev);
+        await this.pop_item(ev);
         break;
     }
   }

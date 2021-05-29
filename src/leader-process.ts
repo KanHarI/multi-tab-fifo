@@ -293,24 +293,15 @@ class LeaderProcess {
 
   public async stop(): Promise<void> {
     this.is_stopped = true;
-    console.log("A");
     this.stopper_deferred.resolve();
-    console.log("B");
     await this.startup_thread;
-    console.log("C");
     this._is_leading = false;
-    console.log("D");
     await this.elector.die();
-    console.log("E");
     const broadcast_channel_closing = this.broadcast_channel.close();
-    console.log("F");
     const leader_channel_closing = this.leader_channel.close();
-    console.log("G");
     // await this.thread;
     await broadcast_channel_closing;
-    console.log("H");
     await leader_channel_closing;
-    console.log("I");
     console.debug("Exited leader gracefully");
   }
 }

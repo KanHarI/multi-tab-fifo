@@ -2,7 +2,6 @@ import { Worker } from "../src/worker";
 import { sleep } from "../src/sleep";
 
 async function immediately_dying_leader(leader_death: number) {
-  console.log("start");
   const results = new Array<number>();
   const w1 = new Worker<number>(
     "imm_dying_leader_" + leader_death,
@@ -18,26 +17,19 @@ async function immediately_dying_leader(leader_death: number) {
       results.push(data);
     }
   );
-  console.log("00");
   w2.push_message(0);
   w2.push_message(1);
   w2.push_message(2);
   w2.push_message(3);
   w2.push_message(4);
   w2.push_message(5);
-  console.log("AA");
   if (leader_death > 0) {
     await sleep(leader_death);
   }
-  console.log("BB");
   await w1.stop();
-  console.log("CC");
-  await sleep(2000 - leader_death);
-  console.log("DD");
+  await sleep(5000 - leader_death);
   expect(results).toStrictEqual([0, 1, 2, 3, 4, 5]);
-  console.log("EE");
   await w2.stop();
-  console.log("FF");
 }
 
 test("Immediately dying leader 0", async () => {
