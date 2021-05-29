@@ -84,6 +84,7 @@ class Worker<T> {
           worker_id: this.worker_id,
           item_id: item_id,
           date: this.queued_items[item_id].date,
+          priority: this.queued_items[item_id].priority,
         },
       });
     }
@@ -121,7 +122,10 @@ class Worker<T> {
     await this.leader_process.set_max_concurrent_workers(n);
   }
 
-  public async push_message(data: T): Promise<Promise<unknown> | undefined> {
+  public async push_message(
+    data: T,
+    priority = 0
+  ): Promise<Promise<unknown> | undefined> {
     if (this.is_stopped) {
       return undefined;
     }
@@ -130,6 +134,7 @@ class Worker<T> {
       item_id: generate_uuid(),
       date: Date.now(),
       data: data,
+      priority: priority,
     };
     console.debug("Prepushing message with id: " + queued_item.item_id);
     this.queued_items[queued_item.item_id] = queued_item;
@@ -140,6 +145,7 @@ class Worker<T> {
         worker_id: this.worker_id,
         item_id: queued_item.item_id,
         date: queued_item.date,
+        priority: queued_item.priority,
       },
     });
     return this.queued_promiese[queued_item.item_id].promise;
