@@ -125,7 +125,7 @@ class Worker<T> {
   public async push_message(
     data: T,
     priority = 0
-  ): Promise<Promise<unknown> | undefined> {
+  ): Promise<Deferred<unknown> | undefined> {
     if (this.is_stopped) {
       return undefined;
     }
@@ -148,17 +148,11 @@ class Worker<T> {
         priority: queued_item.priority,
       },
     });
-    return this.queued_promiese[queued_item.item_id].promise;
+    return this.queued_promiese[queued_item.item_id];
   }
 
-  public async push_message_and_wait_for_completion(
-    data: T
-  ): Promise<unknown | undefined> {
-    const promise = this.push_message(data);
-    if (promise == undefined) {
-      return undefined;
-    }
-    return await promise;
+  public is_leading(): boolean {
+    return this.leader_process.is_leading();
   }
 
   public async stop(): Promise<void> {

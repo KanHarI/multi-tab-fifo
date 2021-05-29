@@ -1,3 +1,4 @@
+import { Deferred } from "ts-deferred";
 import { Worker } from "./worker";
 
 class TabSharedThreadpool {
@@ -16,19 +17,25 @@ class TabSharedThreadpool {
   }
 
   public async push_task(
-    callback: () => Promise<unknown>
-  ): Promise<Promise<unknown> | undefined> {
-    return this.fifo_worker.push_message(callback);
+    callback: () => Promise<unknown>,
+    priority = 0
+  ): Promise<Deferred<unknown> | undefined> {
+    return this.fifo_worker.push_message(callback, priority);
   }
 
   public async push_task_and_await_completion<U>(
-    callback: () => Promise<U>
+    callback: () => Promise<U>,
+    priority = 0
   ): Promise<U | undefined> {
-    const promise = await this.push_task(callback);
-    if (promise == undefined) {
+    const deferred = await this.push_task(callback, priority);
+    if (deferred == undefined) {
       return undefined;
     }
-    return (await promise) as U;
+    return (await deferred.promise) as U;
+  }
+
+  public is_leading(): boolean {
+    return this.fifo_worker.is_leading();
   }
 
   public async stop(): Promise<void> {

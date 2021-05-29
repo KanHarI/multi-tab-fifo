@@ -12,13 +12,14 @@ import {
   LeaderElector,
   createLeaderElection,
 } from "broadcast-channel";
+import { Deferred } from "ts-deferred";
 import { uuid } from "./uuid";
 
 class LeaderProcess {
   private readonly broadcast_channel: BroadcastChannel<BroadcastMessage>;
   private readonly leader_channel: BroadcastChannel<BroadcastMessage>;
   private readonly elector: LeaderElector;
-  private readonly thread: Promise<void>;
+  private readonly startup_thread: Promise<void>;
   private readonly worker_ids: Set<uuid>;
   private readonly queued_messages_by_priority: Record<
     number,
@@ -30,14 +31,15 @@ class LeaderProcess {
     Record<uuid, Array<LeaderQueuedItem>>
   >;
   private is_stopped: boolean;
-  private is_leading: boolean;
+  private _is_leading: boolean;
   private max_wip_messages: number;
+  private readonly stopper_deferred: Deferred<void>;
 
   constructor(channel_name: string) {
     const leader_channel_name = channel_name + "_leader";
     this.max_wip_messages = 1;
     this.is_stopped = false;
-    this.is_leading = false;
+    this._is_leading = false;
     this.messages_under_processing = {};
     this.incoming_messages_by_priority_then_worker_id = {};
     this.queued_messages_by_priority = {};
@@ -45,7 +47,8 @@ class LeaderProcess {
     this.broadcast_channel = new BroadcastChannel(channel_name);
     this.leader_channel = new BroadcastChannel(leader_channel_name);
     this.elector = createLeaderElection(this.broadcast_channel);
-    this.thread = this.leadership_process();
+    this.stopper_deferred = new Deferred<void>();
+    this.startup_thread = this.leadership_process();
   }
 
   private async broadcast_message_callback(
@@ -140,15 +143,18 @@ class LeaderProcess {
   }
 
   private async leadership_process(): Promise<void> {
-    await this.elector.awaitLeadership();
-    console.debug("Initializing leader");
-    this.is_leading = true;
-    this.broadcast_channel.onmessage = this.broadcast_message_callback.bind(
-      this
-    );
+    await Promise.race([
+      this.elector.awaitLeadership(),
+      this.stopper_deferred.promise,
+    ]);
     if (this.is_stopped) {
       return;
     }
+    console.debug("Initializing leader");
+    this._is_leading = true;
+    this.broadcast_channel.onmessage = this.broadcast_message_callback.bind(
+      this
+    );
     await this.broadcast_channel.postMessage({
       message_type: MessageType.LEADER_CREATED,
       message_body: {},
@@ -158,7 +164,7 @@ class LeaderProcess {
 
   public async set_max_concurrent_workers(n: number): Promise<void> {
     this.max_wip_messages = n;
-    if (this.is_leading) {
+    if (this._is_leading) {
       await this.pop_available_items();
     }
   }
@@ -270,6 +276,7 @@ class LeaderProcess {
           })
         );
         num_wip_messages++;
+        break;
       }
     }
     for (const callback of poped_callbacks) {
@@ -277,16 +284,30 @@ class LeaderProcess {
     }
   }
 
+  public is_leading(): boolean {
+    return this._is_leading;
+  }
+
   public async stop(): Promise<void> {
     this.is_stopped = true;
-    this.is_leading = false;
-    const leader_dying = this.elector.die();
+    console.log("A");
+    this.stopper_deferred.resolve();
+    console.log("B");
+    await this.startup_thread;
+    console.log("C");
+    this._is_leading = false;
+    console.log("D");
+    await this.elector.die();
+    console.log("E");
     const broadcast_channel_closing = this.broadcast_channel.close();
-    await leader_dying;
+    console.log("F");
     const leader_channel_closing = this.leader_channel.close();
+    console.log("G");
     // await this.thread;
     await broadcast_channel_closing;
+    console.log("H");
     await leader_channel_closing;
+    console.log("I");
     console.debug("Exited leader gracefully");
   }
 }
