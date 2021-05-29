@@ -52,6 +52,7 @@ class Worker<T> {
     } finally {
       delete this.queued_promiese[item.item_id];
       if (!this.is_stopped) {
+        console.debug("Finished processing " + item.item_id + " in worker");
         await this.broadcast_channel.postMessage({
           message_type: MessageType.ITEM_PROCESSING_DONE_FROM_WORKER,
           message_body: { worker_id: this.worker_id, item_id: item.item_id },
