@@ -34,9 +34,9 @@ async function immediately_dying_leader(leader_death: number) {
   console.log("CC");
   await sleep(2000 - leader_death);
   console.log("DD");
-  await w2.stop();
-  console.log("EE");
   expect(results).toStrictEqual([0, 1, 2, 3, 4, 5]);
+  console.log("EE");
+  await w2.stop();
   console.log("FF");
 }
 
