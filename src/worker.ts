@@ -38,12 +38,19 @@ class Worker<T> {
       this
     );
     this.registration_thread = this.register_worker_in_leader();
-    if (typeof globalThis !== "undefined") {
-      if (globalThis.addEventListener != undefined) {
-        globalThis.addEventListener("beforeunload", this.stop.bind(this));
+    let registered_event = false;
+    if (typeof window !== "undefined") {
+      if (window.addEventListener != undefined) {
+        window.addEventListener("beforeunload", this.stop.bind(this));
+        registered_event = true;
       }
-    } else {
-      window.addEventListener("beforeunload", this.stop.bind(this));
+    }
+    if (!registered_event) {
+      if (typeof globalThis !== "undefined") {
+        if (globalThis.addEventListener != undefined) {
+          globalThis.addEventListener("beforeunload", this.stop.bind(this));
+        }
+      }
     }
   }
 
