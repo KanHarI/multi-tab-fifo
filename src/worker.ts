@@ -43,7 +43,9 @@ class Worker<T> {
         globalThis.addEventListener("beforeunload", this.stop.bind(this));
       }
     } else {
-      window.addEventListener("beforeunload", this.stop.bind(this));
+      if (window.addEventListener != undefined) {
+        window.addEventListener("beforeunload", this.stop.bind(this));
+      }
     }
   }
 
