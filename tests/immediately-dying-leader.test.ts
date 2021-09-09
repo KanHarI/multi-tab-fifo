@@ -8,14 +8,16 @@ async function immediately_dying_leader(leader_death: number) {
     async (data) => {
       await sleep(200);
       results.push(data);
-    }
+    },
+    globalThis
   );
   const w2 = new Worker<number>(
     "imm_dying_leader_" + leader_death,
     async (data) => {
       await sleep(200);
       results.push(data);
-    }
+    },
+    globalThis
   );
   w2.push_message(0);
   w2.push_message(1);

@@ -1,13 +1,17 @@
-import { TabSharedThreadpool } from "../src";
 import { Worker } from "../src/worker";
+import { create_tab_shared_threadpool_with_global_this } from "../lib/tab-shared-threadpool";
 import { sleep } from "../src/sleep";
 
 test("Test worker priority", async () => {
   const results = new Array<number>();
-  const worker = new Worker<number>("worker_priority", async (data) => {
-    await sleep(1500);
-    results.push(data);
-  });
+  const worker = new Worker<number>(
+    "worker_priority",
+    async (data) => {
+      await sleep(1500);
+      results.push(data);
+    },
+    globalThis
+  );
   await sleep(1500);
   await worker.push_message(0, 0);
   await worker.push_message(1, 1);
@@ -18,7 +22,9 @@ test("Test worker priority", async () => {
 }, 10000);
 
 test("Test threadpool priority", async () => {
-  const threadpool = new TabSharedThreadpool("threadpool_priority");
+  const threadpool = create_tab_shared_threadpool_with_global_this(
+    "threadpool_priority"
+  );
   const results = new Array<number>();
   await sleep(1500);
   threadpool.push_task(async () => {

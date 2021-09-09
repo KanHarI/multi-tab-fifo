@@ -22,7 +22,8 @@ class Worker<T> {
 
   constructor(
     channel_name: string,
-    callback: (arg: T, item_id: uuid) => Promise<unknown>
+    callback: (arg: T, item_id: uuid) => Promise<unknown>,
+    _global_this: Record<string, unknown>
   ) {
     this.queued_promiese = {};
     this.callback = callback;
@@ -38,18 +39,10 @@ class Worker<T> {
       this
     );
     this.registration_thread = this.register_worker_in_leader();
-    let registered_event = false;
-    if (typeof window !== "undefined") {
-      if (window.addEventListener != undefined) {
-        window.addEventListener("beforeunload", this.stop.bind(this));
-        registered_event = true;
-      }
-    }
-    if (!registered_event) {
-      if (typeof globalThis !== "undefined") {
-        if (globalThis.addEventListener != undefined) {
-          globalThis.addEventListener("beforeunload", this.stop.bind(this));
-        }
+    if (_global_this !== null) {
+      if (_global_this.addEventListener !== undefined) {
+        // @ts-ignore
+        _global_this.addEventListener("beforeunload", this.stop.bind(this));
       }
     }
   }
