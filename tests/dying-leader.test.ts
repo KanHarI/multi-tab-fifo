@@ -11,8 +11,7 @@ for (const leader_death of [5, 15, 25, 35, 85, 95, 105, 135, 285, 295, 305]) {
         async (x) => {
           await sleep(200);
           completed_callbacks.push(x);
-        },
-        globalThis
+        }
       );
       await sleep(1500); // Wait for w1 to become leader
       const w2 = new Worker<number>(
@@ -20,8 +19,7 @@ for (const leader_death of [5, 15, 25, 35, 85, 95, 105, 135, 285, 295, 305]) {
         async (x) => {
           await sleep(200);
           completed_callbacks.push(x);
-        },
-        globalThis
+        }
       );
       expect(w1.is_leading()).toBe(true);
       expect(w2.is_leading()).toBe(false);

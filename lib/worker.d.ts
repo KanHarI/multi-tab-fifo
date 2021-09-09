@@ -10,7 +10,7 @@ declare class Worker<T> {
     private readonly queued_promiese;
     private registration_thread;
     private is_stopped;
-    constructor(channel_name: string, callback: (arg: T, item_id: uuid) => Promise<unknown>, _global_this: Record<string, unknown>);
+    constructor(channel_name: string, callback: (arg: T, item_id: uuid) => Promise<unknown>);
     private process_item;
     private pop_item;
     private register_worker_in_leader;

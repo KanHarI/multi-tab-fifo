@@ -3,11 +3,10 @@ import { Worker } from "./worker";
 
 class TabSharedThreadpool {
   private readonly fifo_worker: Worker<() => Promise<unknown>>;
-  constructor(threadpool_name: string, _global_this: Record<string, unknown>) {
+  constructor(threadpool_name: string) {
     this.fifo_worker = new Worker<() => Promise<unknown>>(
       threadpool_name + "_threadpool",
-      TabSharedThreadpool.wrapped_callback,
-      _global_this
+      TabSharedThreadpool.wrapped_callback
     );
   }
 
@@ -48,21 +47,4 @@ class TabSharedThreadpool {
   }
 }
 
-function create_tab_shared_threadpool_with_global_this(
-  threadpool_name: string
-): TabSharedThreadpool {
-  return new TabSharedThreadpool(threadpool_name, globalThis);
-}
-
-function create_tab_shared_threadpool_for_browser(
-  threadpool_name: string
-): TabSharedThreadpool {
-  // @ts-ignore
-  return new TabSharedThreadpool(threadpool_name, window);
-}
-
-export {
-  TabSharedThreadpool,
-  create_tab_shared_threadpool_with_global_this,
-  create_tab_shared_threadpool_for_browser,
-};
+export { TabSharedThreadpool };
