@@ -38,11 +38,18 @@ class Worker<T> {
       this
     );
     this.registration_thread = this.register_worker_in_leader();
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const _global_this = require("globalthis")();
-    if (typeof _global_this !== "undefined") {
-      if (_global_this.addEventListener != undefined) {
-        _global_this.addEventListener("beforeunload", this.stop.bind(this));
+    let registered_event = false;
+    if (typeof window !== "undefined") {
+      if (window.addEventListener != undefined) {
+        window.addEventListener("beforeunload", this.stop.bind(this));
+        registered_event = true;
+      }
+    }
+    if (!registered_event) {
+      if (typeof globalThis !== "undefined") {
+        if (globalThis.addEventListener != undefined) {
+          globalThis.addEventListener("beforeunload", this.stop.bind(this));
+        }
       }
     }
   }
