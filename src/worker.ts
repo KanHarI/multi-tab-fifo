@@ -38,8 +38,12 @@ class Worker<T> {
       this
     );
     this.registration_thread = this.register_worker_in_leader();
-    if (globalThis.addEventListener != undefined) {
-      globalThis.addEventListener("beforeunload", this.stop.bind(this));
+    if (typeof globalThis !== "undefined") {
+      if (globalThis.addEventListener != undefined) {
+        globalThis.addEventListener("beforeunload", this.stop.bind(this));
+      }
+    } else {
+      window.addEventListener("beforeunload", this.stop.bind(this));
     }
   }
 
